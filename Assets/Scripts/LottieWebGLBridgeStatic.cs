@@ -1,39 +1,39 @@
 using UnityEngine;
-using Gilzoide.LottiePlayer;
+using SkiaSharp.Unity;
 using System.Collections.Generic;
 
 /// <summary>
 /// ALTERNATIVA: Bridge che usa asset pre-importati invece di JSON dinamico
 /// Usa questo se il caricamento dinamico da JSON string non funziona bene in WebGL
+/// Rendering con SkiaForUnity (Skottie)
 /// </summary>
 public class LottieWebGLBridgeStatic : MonoBehaviour
 {
     [Header("Lottie Player")]
-    [SerializeField] private ImageLottiePlayer lottiePlayer;
+    [SerializeField] private SkottiePlayerV2 skottiePlayer;
 
     [Header("Pre-loaded Animations")]
-    [SerializeField] private List<LottieAnimationAsset> animations = new List<LottieAnimationAsset>();
+    [SerializeField] private List<TextAsset> animations = new List<TextAsset>();
     [SerializeField] private List<string> animationNames = new List<string>();
 
     [Header("Settings")]
     [SerializeField] private bool playOnReceive = true;
 
-    private Dictionary<string, LottieAnimationAsset> animationDict;
+    private Dictionary<string, TextAsset> animationDict;
 
     private void Start()
     {
-        if (lottiePlayer == null)
+        if (skottiePlayer == null)
         {
-            lottiePlayer = GetComponent<ImageLottiePlayer>();
+            skottiePlayer = GetComponent<SkottiePlayerV2>();
 
-            if (lottiePlayer == null)
+            if (skottiePlayer == null)
             {
-                Debug.LogError("LottieWebGLBridgeStatic: Nessun ImageLottiePlayer trovato!");
+                Debug.LogError("LottieWebGLBridgeStatic: Nessun SkottiePlayerV2 trovato!");
             }
         }
 
-        // Crea dizionario nome -> asset
-        animationDict = new Dictionary<string, LottieAnimationAsset>();
+        animationDict = new Dictionary<string, TextAsset>();
         for (int i = 0; i < Mathf.Min(animations.Count, animationNames.Count); i++)
         {
             if (animations[i] != null && !string.IsNullOrEmpty(animationNames[i]))
@@ -46,10 +46,6 @@ public class LottieWebGLBridgeStatic : MonoBehaviour
         Debug.Log($"LottieWebGLBridgeStatic: Pronto con {animationDict.Count} animazioni pre-caricate");
     }
 
-    /// <summary>
-    /// Riceve il NOME dell'animazione da React (invece del JSON completo)
-    /// Chiamato da React con: unityInstance.SendMessage('LottieBridge', 'LoadAnimationByName', 'nomeAnimazione')
-    /// </summary>
     public void LoadAnimationByName(string animationName)
     {
         if (string.IsNullOrEmpty(animationName))
@@ -58,33 +54,31 @@ public class LottieWebGLBridgeStatic : MonoBehaviour
             return;
         }
 
-        if (lottiePlayer == null)
+        if (skottiePlayer == null)
         {
-            Debug.LogError("LottieWebGLBridgeStatic: ImageLottiePlayer non assegnato!");
+            Debug.LogError("LottieWebGLBridgeStatic: SkottiePlayerV2 non assegnato!");
             return;
         }
 
         if (!animationDict.ContainsKey(animationName))
         {
-            Debug.LogError($"LottieWebGLBridgeStatic: Animazione '{animationName}' non trovata! Animazioni disponibili: {string.Join(", ", animationDict.Keys)}");
+            Debug.LogError($"LottieWebGLBridgeStatic: Animazione '{animationName}' non trovata! Disponibili: {string.Join(", ", animationDict.Keys)}");
             return;
         }
 
-        LottieAnimationAsset asset = animationDict[animationName];
-        lottiePlayer.SetAnimationAsset(asset);
+        TextAsset asset = animationDict[animationName];
+        skottiePlayer.LoadAnimation(asset.text);
 
         Debug.Log($"LottieWebGLBridgeStatic: Animazione '{animationName}' caricata");
 
         if (playOnReceive)
         {
-            lottiePlayer.Play();
+            skottiePlayer.loop = true;
+            skottiePlayer.PlayAnimation();
             Debug.Log("LottieWebGLBridgeStatic: Animazione avviata");
         }
     }
 
-    /// <summary>
-    /// Riceve un index numerico (alternativa al nome)
-    /// </summary>
     public void LoadAnimationByIndex(int index)
     {
         if (index < 0 || index >= animations.Count)
@@ -95,22 +89,20 @@ public class LottieWebGLBridgeStatic : MonoBehaviour
 
         if (animations[index] == null)
         {
-            Debug.LogError($"LottieWebGLBridgeStatic: Animazione all'index {index} è null!");
+            Debug.LogError($"LottieWebGLBridgeStatic: Animazione all'index {index} e' null!");
             return;
         }
 
-        lottiePlayer.SetAnimationAsset(animations[index]);
+        skottiePlayer.LoadAnimation(animations[index].text);
         Debug.Log($"LottieWebGLBridgeStatic: Animazione index {index} caricata");
 
         if (playOnReceive)
         {
-            lottiePlayer.Play();
+            skottiePlayer.loop = true;
+            skottiePlayer.PlayAnimation();
         }
     }
 
-    /// <summary>
-    /// Lista delle animazioni disponibili (per debug)
-    /// </summary>
     public void ListAnimations()
     {
         Debug.Log($"LottieWebGLBridgeStatic: Animazioni disponibili ({animationDict.Count}):");
@@ -122,18 +114,14 @@ public class LottieWebGLBridgeStatic : MonoBehaviour
 
     public void PauseAnimation()
     {
-        if (lottiePlayer != null)
-        {
-            lottiePlayer.Pause();
-            Debug.Log("LottieWebGLBridgeStatic: Animazione in pausa");
-        }
+        Debug.Log("LottieWebGLBridgeStatic: Animazione in pausa");
     }
 
     public void PlayAnimation()
     {
-        if (lottiePlayer != null)
+        if (skottiePlayer != null)
         {
-            lottiePlayer.Play();
+            skottiePlayer.PlayAnimation();
             Debug.Log("LottieWebGLBridgeStatic: Animazione avviata/ripresa");
         }
     }

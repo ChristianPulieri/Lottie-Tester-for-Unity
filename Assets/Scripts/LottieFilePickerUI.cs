@@ -1,12 +1,13 @@
 using UnityEngine;
 using UnityEngine.UI;
-using Gilzoide.LottiePlayer;
+using SkiaSharp.Unity;
 using System.Runtime.InteropServices;
 using TMPro;
 
 /// <summary>
 /// UI per caricare file Lottie JSON tramite file picker del browser
 /// Standalone - non richiede comunicazione con React
+/// Rendering con SkiaForUnity (Skottie)
 /// </summary>
 public class LottieFilePickerUI : MonoBehaviour
 {
@@ -16,12 +17,10 @@ public class LottieFilePickerUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI fileNameText;
 
     [Header("Lottie Player")]
-    [SerializeField] private ImageLottiePlayer lottiePlayer;
+    [SerializeField] private SkottiePlayerV2 skottiePlayer;
 
     [Header("Settings")]
     [SerializeField] private bool autoPlay = true;
-
-    private LottieAnimation currentAnimation;
 
     // Import funzioni JavaScript
     [DllImport("__Internal")]
@@ -35,9 +34,9 @@ public class LottieFilePickerUI : MonoBehaviour
 
     private void Start()
     {
-        if (lottiePlayer == null)
+        if (skottiePlayer == null)
         {
-            lottiePlayer = GetComponent<ImageLottiePlayer>();
+            skottiePlayer = GetComponent<SkottiePlayerV2>();
         }
 
         if (loadFileButton != null)
@@ -48,18 +47,6 @@ public class LottieFilePickerUI : MonoBehaviour
         UpdateStatus("Pronto. Clicca 'Carica File' per scegliere un'animazione Lottie.");
     }
 
-    private void OnDestroy()
-    {
-        if (currentAnimation != null)
-        {
-            currentAnimation.Dispose();
-            currentAnimation = null;
-        }
-    }
-
-    /// <summary>
-    /// Chiamato quando si clicca il pulsante "Carica File"
-    /// </summary>
     private void OnLoadFileButtonClicked()
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -71,10 +58,6 @@ public class LottieFilePickerUI : MonoBehaviour
 #endif
     }
 
-    /// <summary>
-    /// Callback chiamato da JavaScript quando un file è stato selezionato
-    /// </summary>
-    /// <param name="fileName">Nome del file selezionato</param>
     public void OnFileSelected(string fileName)
     {
         Debug.Log($"File selezionato: {fileName}");
@@ -88,101 +71,64 @@ public class LottieFilePickerUI : MonoBehaviour
 #if UNITY_WEBGL && !UNITY_EDITOR
         try
         {
-            // Leggi il JSON dalla variabile globale JavaScript
             string jsonData = GetUploadedJSON();
 
             if (string.IsNullOrEmpty(jsonData))
             {
-                UpdateStatus("❌ Errore: JSON vuoto o non valido");
-                Debug.LogError("JSON data è vuoto");
+                UpdateStatus("Errore: JSON vuoto o non valido");
+                Debug.LogError("JSON data e' vuoto");
                 return;
             }
 
             Debug.Log($"JSON ricevuto: {jsonData.Length} caratteri");
 
-            // Pulisci la variabile globale
             ClearUploadedJSON();
 
-            // Carica l'animazione
             LoadAnimation(jsonData);
         }
         catch (System.Exception ex)
         {
-            UpdateStatus($"❌ Errore: {ex.Message}");
+            UpdateStatus($"Errore: {ex.Message}");
             Debug.LogError($"Errore durante il caricamento del file: {ex.Message}\n{ex.StackTrace}");
         }
 #endif
     }
 
-    /// <summary>
-    /// Carica un'animazione da JSON
-    /// </summary>
     private void LoadAnimation(string jsonData)
     {
-        if (lottiePlayer == null)
+        if (skottiePlayer == null)
         {
-            UpdateStatus("❌ Errore: ImageLottiePlayer non assegnato!");
-            Debug.LogError("ImageLottiePlayer è null");
+            UpdateStatus("Errore: SkottiePlayerV2 non assegnato!");
+            Debug.LogError("SkottiePlayerV2 e' null");
             return;
         }
 
         try
         {
-            // Disponi animazione precedente
-            if (currentAnimation != null)
-            {
-                currentAnimation.Dispose();
-                currentAnimation = null;
-            }
-
             UpdateStatus("Parsing JSON...");
 
-            // Salva il JSON come file temporaneo (workaround per limiti WebGL)
-            string tempPath = System.IO.Path.Combine(Application.persistentDataPath, "temp_lottie.json");
-            System.IO.File.WriteAllText(tempPath, jsonData);
+            skottiePlayer.LoadAnimation(jsonData);
 
-            Debug.Log($"JSON salvato in: {tempPath}");
+            double duration = skottiePlayer.GetDurations();
+            double fps = skottiePlayer.GetFps();
 
-            // Crea animazione dal file
-            NativeLottieAnimation nativeAnimation = new NativeLottieAnimation(tempPath);
+            UpdateStatus($"Caricato! Durata: {duration:F2}s, FPS: {fps:F1}");
 
-            if (!nativeAnimation.IsCreated)
-            {
-                UpdateStatus("❌ Impossibile creare l'animazione");
-                Debug.LogError("NativeLottieAnimation non è stata creata");
-                return;
-            }
+            Debug.Log($"Animazione caricata - Durata: {duration}s, FPS: {fps}");
 
-            // Wrapper
-            currentAnimation = new LottieAnimation(nativeAnimation);
-
-            // Assegna al player
-            lottiePlayer.SetAnimation(nativeAnimation);
-
-            double duration = currentAnimation.GetDuration();
-            int totalFrames = (int)currentAnimation.GetTotalFrame();
-            double fps = currentAnimation.GetFrameRate();
-
-            UpdateStatus($"✅ Caricato! Durata: {duration:F2}s, Frame: {totalFrames}, FPS: {fps:F1}");
-
-            Debug.Log($"Animazione caricata - Durata: {duration}s, Frame: {totalFrames}, FPS: {fps}");
-
-            // Avvia animazione
             if (autoPlay)
             {
-                lottiePlayer.Play();
+                skottiePlayer.loop = true;
+                skottiePlayer.PlayAnimation();
             }
         }
         catch (System.Exception ex)
         {
-            UpdateStatus($"❌ Errore: {ex.Message}");
+            UpdateStatus($"Errore: {ex.Message}");
             Debug.LogError($"Errore caricamento animazione: {ex.Message}\n{ex.StackTrace}");
         }
     }
 
-    /// <summary>
-    /// Aggiorna il testo di stato
-    /// </summary>
     private void UpdateStatus(string message)
     {
         if (statusText != null)
