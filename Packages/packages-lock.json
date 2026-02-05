@@ -1,5 +1,14 @@
 {
   "dependencies": {
+    "com.ammariqais.skiaforunity": {
+      "version": "https://github.com/ammariqais/SkiaForUnity.git?path=SkiaUnity/Assets/SkiaSharp",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.0"
+      },
+      "hash": "67b16cb794b28a70661dc0de77dd4ee9a682b999"
+    },
     "com.unity.2d.animation": {
       "version": "12.0.2",
       "depth": 0,
